@@ -186,17 +186,6 @@ router.get('/:id', async (req, res) => {
         },
       },
       run: {
-        select: {
-          id: true,
-          distance: true,
-          duration: true,
-          avgPace: true,
-          maxPace: true,
-          calories: true,
-          elevationGain: true,
-          mapSnapshotUrl: true,
-          startTime: true,
-        },
         include: {
           coordinates: { orderBy: { timestamp: 'asc' } },
           splits: { orderBy: { km: 'asc' } },
