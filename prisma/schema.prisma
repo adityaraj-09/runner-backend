@@ -1,0 +1,551 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  clerkId       String   @unique
+  email         String   @unique
+  username      String   @unique
+  fullName      String
+  avatarUrl     String?
+  bio           String?
+  location      String?
+
+  // Location for nearby users
+  latitude      Float?
+  longitude     Float?
+  lastLocationUpdate DateTime?
+  isLocationPublic Boolean @default(true)
+
+  // Stats
+  totalDistance Float    @default(0)
+  totalRuns     Int      @default(0)
+  totalTime     Int      @default(0)
+  level         Int      @default(1)
+  xp            Int      @default(0)
+
+  // Settings
+  isPublic      Boolean  @default(true)
+  isCurrentlyRunning Boolean @default(false)
+  currentRunId  String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  runs            Run[]
+  routes          Route[]
+  posts           Post[]
+  comments        Comment[]
+  likes           Like[]
+  routeLikes      RouteLike[]
+  groupMemberships GroupMember[]
+  eventParticipations EventParticipant[]
+  capturedAreas   CapturedArea[]
+  notifications   Notification[]
+  sentNotifications Notification[] @relation("SentNotifications")
+  followers       Follow[] @relation("following")
+  following       Follow[] @relation("follower")
+  achievements    UserAchievement[]
+
+  // Messaging
+  conversations   ConversationParticipant[]
+  messages        Message[]
+
+  @@index([clerkId])
+  @@index([username])
+  @@index([latitude, longitude])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Run {
+  id          String   @id @default(cuid())
+  userId      String
+  routeId     String?
+
+  // Timing
+  startTime   DateTime
+  endTime     DateTime?
+
+  // Stats
+  distance    Float    @default(0)
+  duration    Int      @default(0)
+  avgPace     Float    @default(0)
+  maxPace     Float    @default(0)
+  minPace     Float    @default(0)
+  calories    Int      @default(0)
+  elevation   Float    @default(0)
+  elevationGain Float  @default(0)
+  elevationLoss Float  @default(0)
+
+  // Status
+  isCompleted Boolean  @default(false)
+  isPaused    Boolean  @default(false)
+
+  // Map snapshot
+  mapSnapshotUrl String?
+
+  // Weather at run time
+  weather     Json?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  route       Route?        @relation(fields: [routeId], references: [id])
+  coordinates RunCoordinate[]
+  splits      RunSplit[]
+  posts       Post[]
+  photos      RunPhoto[]
+
+  @@index([userId])
+  @@index([routeId])
+  @@index([createdAt])
+  @@index([isCompleted])
+}
+
+model RunCoordinate {
+  id        String   @id @default(cuid())
+  runId     String
+  latitude  Float
+  longitude Float
+  altitude  Float?
+  speed     Float?
+  accuracy  Float?
+  heading   Float?
+  timestamp DateTime
+
+  // For tracking heart rate if available
+  heartRate Int?
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([timestamp])
+}
+
+model RunSplit {
+  id        String @id @default(cuid())
+  runId     String
+  km        Int
+  time      Int
+  pace      Float
+  elevation Float  @default(0)
+  avgHeartRate Int?
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+}
+
+model RunPhoto {
+  id        String   @id @default(cuid())
+  runId     String
+  imageUrl  String
+  latitude  Float?
+  longitude Float?
+  caption   String?
+  takenAt   DateTime @default(now())
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+}
+
+model Route {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  description   String?
+  distance      Float
+  estimatedTime Int
+  difficulty    Difficulty @default(EASY)
+  elevation     Float    @default(0)
+  elevationGain Float    @default(0)
+  isPublic      Boolean  @default(true)
+  thumbnailUrl  String?
+
+  // Location info
+  city          String?
+  country       String?
+
+  // Stats
+  timesRun      Int      @default(0)
+  avgRating     Float    @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coordinates RouteCoordinate[]
+  runs        Run[]
+  events      GroupEvent[]
+  likes       RouteLike[]
+
+  @@index([userId])
+  @@index([isPublic])
+  @@index([difficulty])
+  @@index([city])
+}
+
+model RouteLike {
+  id        String   @id @default(cuid())
+  userId    String
+  routeId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, routeId])
+  @@index([routeId])
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model RouteCoordinate {
+  id        String @id @default(cuid())
+  routeId   String
+  latitude  Float
+  longitude Float
+  altitude  Float?
+  order     Int
+
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@index([routeId])
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  userId    String
+  runId     String?
+  imageUrl  String?
+  caption   String?
+
+  // Location
+  latitude  Float?
+  longitude Float?
+  locationName String?
+
+  isPublic  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  run      Run?      @relation(fields: [runId], references: [id])
+  comments Comment[]
+  likes    Like[]
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([latitude, longitude])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  content   String
+
+  // For replies
+  parentId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([postId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  imageUrl    String?
+  ownerId     String
+
+  // Location
+  city        String?
+  country     String?
+  latitude    Float?
+  longitude   Float?
+
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members GroupMember[]
+  events  GroupEvent[]
+
+  @@index([ownerId])
+  @@index([city])
+}
+
+model GroupMember {
+  id        String      @id @default(cuid())
+  userId    String
+  groupId   String
+  role      GroupRole   @default(MEMBER)
+  joinedAt  DateTime    @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+}
+
+enum GroupRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model GroupEvent {
+  id              String      @id @default(cuid())
+  groupId         String
+  routeId         String?
+  creatorId       String
+  name            String
+  description     String?
+  startTime       DateTime
+  endTime         DateTime?
+  meetingAddress  String
+  meetingLat      Float
+  meetingLng      Float
+  maxParticipants Int?
+  status          EventStatus @default(UPCOMING)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  group        Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  route        Route?             @relation(fields: [routeId], references: [id])
+  participants EventParticipant[]
+
+  @@index([groupId])
+  @@index([startTime])
+  @@index([status])
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+model EventParticipant {
+  id       String          @id @default(cuid())
+  userId   String
+  eventId  String
+  status   ParticipantStatus @default(GOING)
+  joinedAt DateTime        @default(now())
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event GroupEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([eventId])
+}
+
+enum ParticipantStatus {
+  GOING
+  MAYBE
+  NOT_GOING
+}
+
+model CapturedArea {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String?
+  area       Float    // Area in square meters
+  perimeter  Float?   // Perimeter in meters
+  capturedAt DateTime @default(now())
+
+  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coordinates CapturedAreaCoordinate[]
+
+  @@index([userId])
+  @@index([area])
+}
+
+model CapturedAreaCoordinate {
+  id        String @id @default(cuid())
+  areaId    String
+  latitude  Float
+  longitude Float
+  order     Int
+
+  area CapturedArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@index([areaId])
+}
+
+model Achievement {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String
+  icon        String
+  xpReward    Int    @default(100)
+
+  // Requirements
+  type        AchievementType
+  threshold   Float // e.g., 100 for "Run 100km"
+
+  createdAt   DateTime @default(now())
+
+  users UserAchievement[]
+}
+
+enum AchievementType {
+  TOTAL_DISTANCE
+  TOTAL_RUNS
+  STREAK
+  SINGLE_RUN_DISTANCE
+  SINGLE_RUN_PACE
+  CAPTURED_AREA
+  SOCIAL_FOLLOWERS
+  SOCIAL_POSTS
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  progress      Float    @default(0) // Progress towards achievement
+  unlockedAt    DateTime?
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  fromUserId String?
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+
+  // Reference to related entity
+  postId    String?
+  runId     String?
+  groupId   String?
+  eventId   String?
+
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user     User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromUser User? @relation("SentNotifications", fields: [fromUserId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([isRead])
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+  GROUP_INVITE
+  EVENT_REMINDER
+  ACHIEVEMENT
+  RUN_COMPLETED
+  NEARBY_RUNNER
+  MESSAGE
+}
+
+// Direct Messaging
+model Conversation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt])
+}
+
+model ConversationParticipant {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+}
+
+model Message {
+  id             String    @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  imageUrl       String?
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt])
+}
