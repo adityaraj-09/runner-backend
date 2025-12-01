@@ -140,13 +140,6 @@ router.post('/', validate(createPostSchema), async (req, res) => {
         },
       },
       run: {
-        select: {
-          id: true,
-          distance: true,
-          duration: true,
-          avgPace: true,
-          mapSnapshotUrl: true,
-        },
         include: {
           coordinates: { orderBy: { timestamp: 'asc' } },
         },
