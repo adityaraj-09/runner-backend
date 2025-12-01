@@ -19,15 +19,28 @@ export const authMiddleware = async (
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      console.log('Auth failed: Missing or invalid Authorization header');
+      return res.status(401).json({ error: 'Unauthorized: Missing token' });
     }
 
     const token = authHeader.split(' ')[1];
+    if (!token) {
+      console.log('Auth failed: Empty token');
+      return res.status(401).json({ error: 'Unauthorized: Empty token' });
+    }
 
     // Verify the token with Clerk
-    const payload = await clerkClient.verifyToken(token);
+    let payload;
+    try {
+      payload = await clerkClient.verifyToken(token);
+    } catch (verifyError: any) {
+      console.error('Token verification failed:', verifyError.message || verifyError);
+      return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
+    }
+
     if (!payload?.sub) {
-      return res.status(401).json({ error: 'Invalid token' });
+      console.log('Auth failed: No subject in token payload');
+      return res.status(401).json({ error: 'Unauthorized: Invalid token payload' });
     }
 
     // Find or create user in our database
@@ -36,6 +49,7 @@ export const authMiddleware = async (
     });
 
     if (!user) {
+      console.log('Creating new user for clerkId:', payload.sub);
       const clerkUser = await clerkClient.users.getUser(payload.sub);
       user = await prisma.user.create({
         data: {
@@ -46,13 +60,14 @@ export const authMiddleware = async (
           avatarUrl: clerkUser.imageUrl,
         },
       });
+      console.log('New user created:', user.id);
     }
 
     req.userId = user.id;
     req.clerkUserId = payload.sub;
     next();
-  } catch (error) {
-    console.error('Auth error:', error);
-    return res.status(401).json({ error: 'Unauthorized' });
+  } catch (error: any) {
+    console.error('Auth middleware error:', error.message || error);
+    return res.status(401).json({ error: 'Unauthorized: Authentication failed' });
   }
 };

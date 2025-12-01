@@ -67,14 +67,6 @@ router.get('/feed', validate(feedQuerySchema, 'query'), async (req, res) => {
         },
       },
       run: {
-        select: {
-          id: true,
-          distance: true,
-          duration: true,
-          avgPace: true,
-          elevationGain: true,
-          mapSnapshotUrl: true,
-        },
         include: {
           coordinates: {
             orderBy: { timestamp: 'asc' },
