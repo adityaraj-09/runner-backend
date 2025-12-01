@@ -98,8 +98,8 @@ router.get('/feed', validate(feedQuerySchema, 'query'), async (req, res) => {
       return {
         ...post,
         isLiked: !!liked,
-        likesCount: post._count.likes,
-        commentsCount: post._count.comments,
+        likesCount: (post as any)._count.likes,
+        commentsCount: (post as any)._count.comments,
       };
     })
   );

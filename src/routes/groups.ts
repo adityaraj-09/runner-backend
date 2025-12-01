@@ -95,6 +95,7 @@ router.post('/:id/events', async (req, res) => {
   const event = await prisma.groupEvent.create({
     data: {
       groupId: req.params.id,
+      creatorId: req.userId!,
       routeId,
       name,
       description,

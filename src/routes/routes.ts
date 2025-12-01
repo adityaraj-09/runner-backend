@@ -74,12 +74,20 @@ router.get('/:id', async (req, res) => {
 // Like/unlike route
 router.post('/:id/like', async (req, res) => {
   const { id } = req.params;
-  // Simplified - would need a proper likes table for routes
-  await prisma.route.update({
-    where: { id },
-    data: { likes: { increment: 1 } },
+
+  const existingLike = await prisma.routeLike.findUnique({
+    where: { userId_routeId: { userId: req.userId!, routeId: id } },
   });
-  res.json({ success: true });
+
+  if (existingLike) {
+    await prisma.routeLike.delete({ where: { id: existingLike.id } });
+    res.json({ liked: false });
+  } else {
+    await prisma.routeLike.create({
+      data: { userId: req.userId!, routeId: id },
+    });
+    res.json({ liked: true });
+  }
 });
 
 export default router;
